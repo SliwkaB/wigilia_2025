@@ -24,8 +24,24 @@
         .reserved-by { color: #5cb85c; font-weight: bold; margin-left: 10px; }
         .disabled { opacity: 0.5; cursor: not-allowed; background-color: #fafafa; }
         
-        /* NOWA KLASA BLOKUJĄCA KLIKNIĘCIA */
+        /* Klasa blokująca kliknięcia */
         .disabled-click { pointer-events: none; }
+
+        /* STYL DLA NOWEGO PRZYCISKU ZAPISZ */
+        #save-and-finish {
+            width: 100%;
+            padding: 10px;
+            margin-top: 25px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 1.1em;
+            cursor: pointer;
+        }
+        #save-and-finish:hover {
+            background-color: #0056b3;
+        }
         
         .info { text-align: center; margin-top: 20px; color: #666; font-size: 0.9em; }
         #loading-info { color: #007bff; font-weight: bold; margin-top: 10px; }
@@ -61,6 +77,7 @@
         <h2>Dostępne Potrawy</h2>
         <ul class="food-list" id="food-list">
         </ul>
+        <button id="save-and-finish" onclick="resetNameSelection()">Zapisz wybór i zakończ</button>
     </div>
 
     <p class="info">
@@ -157,7 +174,7 @@
         });
     }
 
-    // FUNKCJA Z NAJSILNIEJSZĄ LOGIKĄ BLOKOWANIA
+    // FUNKCJA BLOKUJĄCA I WIZUALIZUJĄCA STAN
     function updateView() {
         const selectedName = localStorage.getItem('selectedUserName');
         
@@ -174,7 +191,7 @@
 
             // CZYŚCIMY WSZYSTKIE KLASY NA POCZĄTKU
             item.classList.remove('disabled'); 
-            item.classList.remove('disabled-click'); // USUWAMY KLASĘ BLOKUJĄCĄ
+            item.classList.remove('disabled-click'); 
             checkbox.checked = false;
             reservedSpan.textContent = '';
             
@@ -185,12 +202,12 @@
                 if (reservedBy !== selectedName) {
                     // Zarezerwowana przez kogoś innego - BLOKUJEMY
                     item.classList.add('disabled'); // Wizualna zmiana (szary kolor)
-                    item.classList.add('disabled-click'); // Blokada klikania (NOWOŚĆ)
+                    item.classList.add('disabled-click'); // Blokada klikania
                     checkbox.checked = false; 
                 } else {
                     // Zarezerwowana przez aktualnego użytkownika - ZAZNACZAMY
                     checkbox.checked = true;
-                    item.classList.remove('disabled-click'); // Użytkownik musi móc kliknąć, by odznaczyć
+                    item.classList.remove('disabled-click'); // Użytkownik może kliknąć, by odznaczyć
                 }
             }
         });
@@ -219,12 +236,17 @@
         }
     }
     
+    // ZMODYFIKOWANA FUNKCJA RESETU
     function resetNameSelection() {
+        // Czyści imię z lokalnej pamięci, ukrywając wybór potraw i pokazując listę imion
         localStorage.removeItem('selectedUserName');
         userSelect.value = ''; 
         foodSelectionArea.classList.add('hidden');
         nameDisplay.classList.add('hidden');
         namePrompt.classList.remove('hidden');
+        // Opcjonalnie: odśwież widok, aby potrawy wyglądały jak dla "niezalogowanego" gościa
+        updateView(); 
+        alert('Twój wybór został zapisany. Dziękujemy!');
     }
 
     // --- Funkcje Obsługi Potraw (Zapis do Firebase) ---
