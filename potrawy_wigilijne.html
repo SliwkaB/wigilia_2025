@@ -18,7 +18,8 @@
         .food-item { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; }
         .food-item:last-child { border-bottom: none; }
         .food-item:hover:not(.disabled) { background-color: #f0f0f5; }
-        .food-item input[type="checkbox"] { margin-right: 15px; transform: scale(1.5); pointer-events: none; }
+        /* POPRAWKA: Usunięto 'pointer-events: none;' aby umożliwić zaznaczanie */
+        .food-item input[type="checkbox"] { margin-right: 15px; transform: scale(1.5); }
         .food-name { flex-grow: 1; font-size: 1.1em; }
         .reserved-by { color: #5cb85c; font-weight: bold; margin-left: 10px; }
         .disabled { opacity: 0.5; cursor: not-allowed; background-color: #fafafa; }
@@ -40,7 +41,7 @@
             <label for="user-select">Wybierz swoje imię:</label>
             <select id="user-select" onchange="handleNameSelection()">
                 <option value="">-- Wybierz imię --</option>
-                </select>
+            </select>
         </div>
 
         <div id="name-selection-display" class="hidden">
@@ -55,7 +56,7 @@
     <div id="food-selection-area" class="hidden">
         <h2>Dostępne Potrawy</h2>
         <ul class="food-list" id="food-list">
-            </ul>
+        </ul>
     </div>
 
     <p class="info">
@@ -64,8 +65,7 @@
 </div>
 
 <script>
-    // --- POPRAWIONA I UPROSZCZONA KONFIGURACJA FIREBASE v8 ---
-    // Usunięto importy i zmienne (app, analytics) z nowszego SDK, które powodowały błąd.
+    // --- KONFIGURACJA FIREBASE (Z Twoimi danymi) ---
     const firebaseConfig = {
         apiKey: "AIzaSyD2HDnccV-GZ__NbDab_3Q0dvQldBA_lvk",
         authDomain: "wigilia-2025.firebaseapp.com",
@@ -74,13 +74,11 @@
         messagingSenderId: "437263304328",
         appId: "1:437263304328:web:a9d9509b7c140b32b8413d",
         measurementId: "G-MEWHH7C706",
-        // WAŻNE: Dodajemy databaseURL, które jest używane przez starsze SDK v8
+        // WAŻNE: Adres URL do bazy danych Realtime Database
         databaseURL: "https://wigilia-2025-default-rtdb.firebaseio.com" 
-        // UWAGA: Jeśli Twoja baza danych w konsoli Firebase ma inną domenę niż 'wigilia-2025-default-rtdb', 
-        // to musisz tu wpisać poprawny URL!
     };
 
-    // --- Konfiguracja Aplikacji (bez zmian) ---
+    // --- Konfiguracja Aplikacji ---
     const names = ['Basia', 'Magda', 'Kamila', 'Piotr', 'Adam']; 
     const dishes = [
         { id: 'ruskie', name: 'Pierogi ruskie' },
@@ -93,7 +91,7 @@
     // ----------------------------------------------------
     // INICJALIZACJA FIREBASE
     // ----------------------------------------------------
-    // Używamy firebase.initializeApp, który jest poprawny dla SDK v8
+    // Poprawna inicjalizacja dla SDK v8
     firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
     const dishesRef = database.ref('dishReservations'); 
@@ -111,7 +109,6 @@
 
     // Funkcja inicjująca rozwijaną listę imion
     function initializeNames() {
-        // Ten blok teraz się wykona, bo usunęliśmy błąd na początku <script>
         names.forEach(name => {
             const option = document.createElement('option');
             option.value = name;
@@ -119,7 +116,6 @@
             userSelect.appendChild(option);
         });
         
-        // Spróbuj wczytać imię z localStorage
         const savedName = localStorage.getItem('selectedUserName');
         if (savedName && names.includes(savedName)) {
             userSelect.value = savedName;
@@ -138,6 +134,7 @@
             const listItem = document.createElement('li');
             listItem.className = 'food-item';
             listItem.setAttribute('data-dish-id', dish.id);
+            // Kliknięcie na CAŁY WIERSZ (li) uruchamia toggleDish
             listItem.onclick = () => toggleDish(dish.id); 
 
             const checkbox = document.createElement('input');
@@ -179,22 +176,25 @@
             reservedSpan.textContent = '';
             
             if (reservedBy) {
+                // Potrawa jest zarezerwowana
                 reservedSpan.textContent = `(${reservedBy})`;
                 
                 if (reservedBy !== selectedName) {
+                    // Zarezerwowana przez kogoś innego - blokujemy interakcję
                     item.classList.add('disabled');
                 } else {
+                    // Zarezerwowana przez aktualnego użytkownika - zaznaczamy
                     checkbox.checked = true;
                 }
             }
         });
     }
 
-    // Nasłuchiwanie zmian w bazie danych
+    // Nasłuchiwanie zmian w bazie danych (Real-Time!)
     dishesRef.on('value', (snapshot) => {
         const data = snapshot.val();
         currentReservations = data || {};
-        updateView(); 
+        updateView(); // Aktualizujemy widok u wszystkich użytkowników
     });
 
 
@@ -221,7 +221,7 @@
         namePrompt.classList.remove('hidden');
     }
 
-    // --- Funkcje Obsługi Potraw ---
+    // --- Funkcje Obsługi Potraw (Zapis do Firebase) ---
     function toggleDish(dishId) {
         const selectedName = localStorage.getItem('selectedUserName');
         if (!selectedName) { 
@@ -230,16 +230,19 @@
         }
         
         const reservedBy = currentReservations[dishId];
-        const item = document.querySelector(`[data-dish-id="${dishId}"]`);
 
+        // Blokada zajętej potrawy
         if (reservedBy && reservedBy !== selectedName) {
              alert(`Potrawa "${dishes.find(d => d.id === dishId).name}" została już wybrana przez ${reservedBy}!`);
              return;
         }
 
+        // Logika zaznaczania/odznaczania
         if (reservedBy === selectedName) {
+            // ODZNACZANIE: Usuń rezerwację z bazy
             dishesRef.child(dishId).remove();
         } else if (!reservedBy) {
+            // ZAZNACZANIE: Dodaj rezerwację do bazy
             dishesRef.child(dishId).set(selectedName);
         }
     }
