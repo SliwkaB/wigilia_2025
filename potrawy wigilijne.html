@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wspólne Zamówienie Potraw (Firebase)</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f4f9; }
+        h1 { color: #333; text-align: center; margin-bottom: 30px; }
+        .container { max-width: 600px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); }
+        .name-selection { padding: 15px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 5px; background-color: #e6f7ff; text-align: center; }
+        .name-selection label, .selected-name-text { display: block; margin-bottom: 10px; font-weight: bold; font-size: 1.2em; }
+        #user-select { padding: 8px; font-size: 1em; border: 1px solid #ccc; border-radius: 4px; min-width: 200px; }
+        .change-button { background-color: #f0ad4e; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; margin-top: 5px; font-size: 0.9em; }
+        .change-button:hover { background-color: #ec971f; }
+        .hidden { display: none; }
+        .food-list { list-style: none; padding: 0; margin-top: 15px; }
+        .food-item { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; }
+        .food-item:last-child { border-bottom: none; }
+        .food-item:hover:not(.disabled) { background-color: #f0f0f5; }
+        .food-item input[type="checkbox"] { margin-right: 15px; transform: scale(1.5); pointer-events: none; }
+        .food-name { flex-grow: 1; font-size: 1.1em; }
+        .reserved-by { color: #5cb85c; font-weight: bold; margin-left: 10px; }
+        .disabled { opacity: 0.5; cursor: not-allowed; background-color: #fafafa; }
+        .info { text-align: center; margin-top: 20px; color: #666; font-size: 0.9em; }
+        #loading-info { color: #007bff; font-weight: bold; margin-top: 10px; }
+    </style>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+</head>
+<body>
+
+<div class="container">
+    <h1>🍽️ Wspólne Zamówienie Potraw</h1>
+
+    <div class="name-selection">
+        
+        <div id="name-selection-prompt">
+            <label for="user-select">Wybierz swoje imię:</label>
+            <select id="user-select" onchange="handleNameSelection()">
+                <option value="">-- Wybierz imię --</option>
+                </select>
+        </div>
+
+        <div id="name-selection-display" class="hidden">
+            <span class="selected-name-text">Jesteś zalogowany jako <span id="selected-name-text-value"></span></span>
+            <button class="change-button" onclick="resetNameSelection()">Zmień osobę</button>
+        </div>
+
+    </div>
+
+    <div id="loading-info">Ładowanie stanu zamówień...</div>
+
+    <div id="food-selection-area" class="hidden">
+        <h2>Dostępne Potrawy</h2>
+        <ul class="food-list" id="food-list">
+            </ul>
+    </div>
+
+    <p class="info">
+        * Aplikacja działa wspólnie dzięki bazie danych Firebase.
+    </p>
+</div>
+
+<script>
+    // --- KROK 4: Wklej TUTAJ swoją konfigurację Firebase! ---
+    // Musisz ją uzyskać z Firebase Console (Krok 2)
+    // Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyD2HDnccV-GZ__NbDab_3Q0dvQldBA_lvk",
+  authDomain: "wigilia-2025.firebaseapp.com",
+  projectId: "wigilia-2025",
+  storageBucket: "wigilia-2025.firebasestorage.app",
+  messagingSenderId: "437263304328",
+  appId: "1:437263304328:web:a9d9509b7c140b32b8413d",
+  measurementId: "G-MEWHH7C706"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+
+    // --- Konfiguracja Aplikacji ---
+    const names = ['Basia', 'Magda', 'Kamila', 'Piotr', 'Adam']; 
+    const dishes = [
+        { id: 'ruskie', name: 'Pierogi ruskie' },
+        { id: 'kapusta_grzyby', name: 'Pierogi z kapustą i grzybami' },
+        { id: 'uszka', name: 'Uszka' },
+        { id: 'barszcz', name: 'Barszcz czerwony' }
+    ];
+    // --- Koniec Konfiguracji ---
+
+    // ----------------------------------------------------
+    // INICJALIZACJA FIREBASE
+    // ----------------------------------------------------
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+    const dishesRef = database.ref('dishReservations'); // Referencja do miejsca w bazie danych
+
+    // Elementy DOM
+    const userSelect = document.getElementById('user-select');
+    const foodList = document.getElementById('food-list');
+    const foodSelectionArea = document.getElementById('food-selection-area');
+    const namePrompt = document.getElementById('name-selection-prompt');
+    const nameDisplay = document.getElementById('name-selection-display');
+    const selectedNameText = document.getElementById('selected-name-text-value');
+    const loadingInfo = document.getElementById('loading-info');
+
+    let currentReservations = {}; // Globalny obiekt do przechowywania aktualnego stanu z bazy
+
+    // Funkcja inicjująca rozwijaną listę imion
+    function initializeNames() {
+        names.forEach(name => {
+            const option = document.createElement('option');
+            option.value = name;
+            option.textContent = name;
+            userSelect.appendChild(option);
+        });
+        
+        // Spróbuj wczytać imię z localStorage (nadal używamy go tylko do zapamiętania, kim jest DANA osoba)
+        const savedName = localStorage.getItem('selectedUserName');
+        if (savedName && names.includes(savedName)) {
+            userSelect.value = savedName;
+            handleNameSelection(); 
+        } else {
+            namePrompt.classList.remove('hidden');
+            nameDisplay.classList.add('hidden');
+            foodSelectionArea.classList.add('hidden');
+        }
+    }
+
+    // Wypełnianie listy potraw (struktura HTML)
+    function initializeDishes() {
+        foodList.innerHTML = '';
+        dishes.forEach(dish => {
+            const listItem = document.createElement('li');
+            listItem.className = 'food-item';
+            listItem.setAttribute('data-dish-id', dish.id);
+            listItem.onclick = () => toggleDish(dish.id); 
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.id = 'dish-' + dish.id;
+            checkbox.name = 'dish-' + dish.id;
+
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'food-name';
+            nameSpan.textContent = dish.name;
+
+            const reservedSpan = document.createElement('span');
+            reservedSpan.className = 'reserved-by';
+
+            listItem.appendChild(checkbox);
+            listItem.appendChild(nameSpan);
+            listItem.appendChild(reservedSpan);
+            foodList.appendChild(listItem);
+        });
+    }
+
+    // Funkcja aktualizująca widok na podstawie danych Z BAZY
+    function updateView() {
+        const selectedName = localStorage.getItem('selectedUserName');
+        
+        loadingInfo.classList.add('hidden'); // Ukrywamy komunikat ładowania
+
+        dishes.forEach(dish => {
+            const item = document.querySelector(`[data-dish-id="${dish.id}"]`);
+            if (!item) return; 
+
+            const checkbox = document.getElementById(`dish-${dish.id}`);
+            const reservedSpan = item.querySelector('.reserved-by');
+            
+            const reservedBy = currentReservations[dish.id]; // Sprawdzamy stan z globalnego obiektu currentReservations
+
+            item.classList.remove('disabled');
+            checkbox.checked = false;
+            reservedSpan.textContent = '';
+            
+            if (reservedBy) {
+                // Potrawa jest zarezerwowana
+                reservedSpan.textContent = `(${reservedBy})`;
+                
+                if (reservedBy !== selectedName) {
+                    // Zarezerwowana przez kogoś innego - blokujemy
+                    item.classList.add('disabled');
+                } else {
+                    // Zarezerwowana przez aktualnego użytkownika - zaznaczamy
+                    checkbox.checked = true;
+                }
+            }
+        });
+    }
+
+    // Nasłuchiwanie zmian w bazie danych
+    dishesRef.on('value', (snapshot) => {
+        // Ta funkcja uruchamia się za każdym razem, gdy ktoś zmieni coś w bazie
+        const data = snapshot.val();
+        currentReservations = data || {};
+        updateView(); // Aktualizujemy widok natychmiast po otrzymaniu nowych danych
+    });
+
+
+    // --- Funkcje Obsługi Imienia (Bez zmian w logice przełączania widoku) ---
+    function handleNameSelection() {
+        const selectedName = userSelect.value;
+        if (selectedName) {
+            localStorage.setItem('selectedUserName', selectedName);
+            namePrompt.classList.add('hidden');
+            selectedNameText.textContent = selectedName;
+            nameDisplay.classList.remove('hidden');
+            foodSelectionArea.classList.remove('hidden');
+            updateView(); // Uruchamiamy odświeżenie widoku z nowo wybranym imieniem
+        } else {
+             resetNameSelection();
+        }
+    }
+    
+    function resetNameSelection() {
+        localStorage.removeItem('selectedUserName');
+        userSelect.value = ''; 
+        foodSelectionArea.classList.add('hidden');
+        nameDisplay.classList.add('hidden');
+        namePrompt.classList.remove('hidden');
+    }
+
+    // --- Funkcje Obsługi Potraw (Teraz aktualizują Bazę Danych!) ---
+    function toggleDish(dishId) {
+        const selectedName = localStorage.getItem('selectedUserName');
+        if (!selectedName) { 
+            alert('Wybierz najpierw swoje imię!');
+            return;
+        }
+        
+        const reservedBy = currentReservations[dishId]; // Pobieramy stan z globalnej zmiennej (synchronizowanej z bazą)
+        const item = document.querySelector(`[data-dish-id="${dishId}"]`);
+
+        // Blokada zajętej potrawy
+        if (reservedBy && reservedBy !== selectedName) {
+             alert(`Potrawa "${dishes.find(d => d.id === dishId).name}" została już wybrana przez ${reservedBy}!`);
+             return;
+        }
+
+        // Logika zaznaczania/odznaczania
+        if (reservedBy === selectedName) {
+            // ODZNACZANIE: Usuń rezerwację z bazy
+            dishesRef.child(dishId).remove();
+        } else if (!reservedBy) {
+            // ZAZNACZANIE: Dodaj rezerwację do bazy
+            dishesRef.child(dishId).set(selectedName);
+        }
+        
+        // Nie musimy wywoływać updateView() ani loadState() - Firebase zrobi to automatycznie!
+    }
+
+    // Uruchomienie inicjalizacji
+    initializeDishes();
+    initializeNames(); 
+</script>
+
+</body>
+</html>
