@@ -18,11 +18,15 @@
         .food-item { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; }
         .food-item:last-child { border-bottom: none; }
         .food-item:hover:not(.disabled) { background-color: #f0f0f5; }
-        /* POPRAWKA: Umożliwienie zaznaczania */
+        /* Umożliwienie zaznaczania */
         .food-item input[type="checkbox"] { margin-right: 15px; transform: scale(1.5); }
         .food-name { flex-grow: 1; font-size: 1.1em; }
         .reserved-by { color: #5cb85c; font-weight: bold; margin-left: 10px; }
         .disabled { opacity: 0.5; cursor: not-allowed; background-color: #fafafa; }
+        
+        /* NOWA KLASA BLOKUJĄCA KLIKNIĘCIA */
+        .disabled-click { pointer-events: none; }
+        
         .info { text-align: center; margin-top: 20px; color: #666; font-size: 0.9em; }
         #loading-info { color: #007bff; font-weight: bold; margin-top: 10px; }
     </style>
@@ -153,7 +157,7 @@
         });
     }
 
-    // FUNKCJA Z NAPRAWIONĄ LOGIKĄ BLOKOWANIA
+    // FUNKCJA Z NAJSILNIEJSZĄ LOGIKĄ BLOKOWANIA
     function updateView() {
         const selectedName = localStorage.getItem('selectedUserName');
         
@@ -168,21 +172,25 @@
             
             const reservedBy = currentReservations[dish.id]; 
 
-            item.classList.remove('disabled'); // ZAWSZE CZYŚCIMY KLASĘ BLOKUJĄCĄ
+            // CZYŚCIMY WSZYSTKIE KLASY NA POCZĄTKU
+            item.classList.remove('disabled'); 
+            item.classList.remove('disabled-click'); // USUWAMY KLASĘ BLOKUJĄCĄ
             checkbox.checked = false;
             reservedSpan.textContent = '';
             
             if (reservedBy) {
-                // Potrawa jest zarezerwowana
+                // Potrawa jest zarezerwowana - ZAWSZE POKAZUJEMY IMIĘ
                 reservedSpan.textContent = `(${reservedBy})`;
                 
                 if (reservedBy !== selectedName) {
                     // Zarezerwowana przez kogoś innego - BLOKUJEMY
-                    item.classList.add('disabled');
-                    checkbox.checked = false; // Upewniamy się, że nie jest zaznaczona
+                    item.classList.add('disabled'); // Wizualna zmiana (szary kolor)
+                    item.classList.add('disabled-click'); // Blokada klikania (NOWOŚĆ)
+                    checkbox.checked = false; 
                 } else {
                     // Zarezerwowana przez aktualnego użytkownika - ZAZNACZAMY
                     checkbox.checked = true;
+                    item.classList.remove('disabled-click'); // Użytkownik musi móc kliknąć, by odznaczyć
                 }
             }
         });
